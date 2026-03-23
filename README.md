@@ -45,9 +45,9 @@ cp .env.example .env
 ```
 
 ```env
-VITE_API_KEY=eght_...          # Journey API key
-VITE_CLIENT_ID=...             # OAuth Client ID  (for recording playback)
-VITE_CLIENT_SECRET=...         # OAuth Client Secret
+VITE_8X8_API_KEY=eght_...          # Journey API key
+VITE_8X8_CLIENT_ID=...             # OAuth Client ID  (for recording playback)
+VITE_8X8_CLIENT_SECRET=...         # OAuth Client Secret
 ```
 
 > These values pre-populate the credential fields on first load. They are never committed — `.env` is gitignored.
