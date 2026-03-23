@@ -1,0 +1,96 @@
+{
+  "info": {
+    "name": "8x8 CIDP Journey API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "api_key",
+      "value": "eght_ZmNlOTYwODItZDg3OC00YzQwLWFlMjctMzdlMzA2ZGNjYzQz",
+      "type": "string"
+    },
+    {
+      "key": "base_url",
+      "value": "https://api-eu.8x8.com/cidp/journey/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Search Journeys",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/journeys/search",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "journeys", "search"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dateRange\": {\n    \"start\": \"2026-03-23T00:00:00Z\",\n    \"end\": \"2026-03-23T23:59:59Z\"\n  },\n  \"displayTimezone\": \"Europe/London\",\n  \"limit\": 50,\n  \"sortDirection\": \"DESC\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Search Transitions",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/transitions/search",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "transitions", "search"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dateRange\": {\n    \"start\": \"2026-03-23T00:00:00Z\",\n    \"end\": \"2026-03-23T23:59:59Z\"\n  },\n  \"displayTimezone\": \"Europe/London\",\n  \"limit\": 50\n}"
+        }
+      }
+    },
+    {
+      "name": "Search Journeys (by Journey ID)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/journeys/search",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "journeys", "search"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dateRange\": {\n    \"start\": \"2026-03-23T00:00:00Z\",\n    \"end\": \"2026-03-23T23:59:59Z\"\n  },\n  \"filters\": [\n    { \"name\": \"journeyId\", \"values\": [\"REPLACE_WITH_JOURNEY_ID\"] }\n  ],\n  \"displayTimezone\": \"Europe/London\",\n  \"limit\": 1\n}"
+        }
+      }
+    },
+    {
+      "name": "Search Transitions (by Journey ID)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-api-key", "value": "{{api_key}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/transitions/search",
+          "host": ["{{base_url}}"],
+          "path": ["v1", "transitions", "search"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dateRange\": {\n    \"start\": \"2026-03-23T00:00:00Z\",\n    \"end\": \"2026-03-23T23:59:59Z\"\n  },\n  \"filters\": [\n    { \"name\": \"journeyId\", \"values\": [\"REPLACE_WITH_JOURNEY_ID\"] }\n  ],\n  \"displayTimezone\": \"Europe/London\",\n  \"limit\": 200\n}"
+        }
+      }
+    }
+  ]
+}
