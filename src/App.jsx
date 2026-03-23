@@ -873,9 +873,9 @@ export default function App() {
     });
   }, []);
 
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('cidp_api_key') || import.meta.env.VITE_API_KEY || '');
-  const [clientId, setClientId] = useState(() => localStorage.getItem('cidp_client_id') || import.meta.env.VITE_CLIENT_ID || '');
-  const [clientSecret, setClientSecret] = useState(() => localStorage.getItem('cidp_client_secret') || import.meta.env.VITE_CLIENT_SECRET || '');
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('cidp_api_key') || import.meta.env.VITE_8X8_API_KEY || '');
+  const [clientId, setClientId] = useState(() => localStorage.getItem('cidp_client_id') || import.meta.env.VITE_8X8_CLIENT_ID || '');
+  const [clientSecret, setClientSecret] = useState(() => localStorage.getItem('cidp_client_secret') || import.meta.env.VITE_8X8_CLIENT_SECRET || '');
   const [region, setRegion] = useState(() => localStorage.getItem('cidp_region') || 'us');
   const [startDate, setStartDate] = useState(todayStart);
   const [endDate, setEndDate] = useState(todayEnd);
