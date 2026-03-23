@@ -27,6 +27,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/proxy\/css-eu/, ''),
       },
+      '/proxy/oauth': {
+        target: 'https://api.8x8.com',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/proxy\/oauth/, '/oauth/v2/token'),
+      },
     },
   },
 })

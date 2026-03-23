@@ -8,7 +8,7 @@ import {
   Play, Pause,
 } from 'lucide-react';
 import { searchJourneys, searchTransitions } from './api';
-import { fetchRecordings, getRecordingUrl } from './cssApi';
+import { fetchRecordings, getRecordingUrl, getAccessToken } from './cssApi';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
 const D = '2026-03-23T';
@@ -594,7 +594,7 @@ function RecordingPlayer({ segments, onProgressChange }) {
   );
 }
 
-function JourneyDetail({ journey, region, apiKey, cssToken, demoTransitions, demoRecordings }) {
+function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTransitions, demoRecordings }) {
   const [transitions, setTransitions] = useState(() =>
     demoTransitions ? { data: [{ transitions: demoTransitions }] } : null
   );
@@ -609,11 +609,12 @@ function JourneyDetail({ journey, region, apiKey, cssToken, demoTransitions, dem
     setRecordingsLoading(true);
     setRecordingsError(null);
     try {
+      const bearerToken = await getAccessToken(clientId, clientSecret);
       const startMs = new Date(journey.time).getTime();
       const endMs = journey.endTime
         ? new Date(journey.endTime).getTime()
         : startMs + 86400000;
-      const objects = await fetchRecordings(region, cssToken, startMs, endMs);
+      const objects = await fetchRecordings(region, bearerToken, startMs, endMs);
       const phone = journey.contact?.phoneNumber;
       const matched = phone
         ? objects.filter(o => JSON.stringify(o.tags || {}).includes(phone))
@@ -623,7 +624,7 @@ function JourneyDetail({ journey, region, apiKey, cssToken, demoTransitions, dem
           id: o.id,
           type: o.type === 'callcenterrecording' ? 'CC' : 'UC',
           duration: null,
-          url: await getRecordingUrl(region, cssToken, o.id),
+          url: await getRecordingUrl(region, bearerToken, o.id),
         }))
       );
       segments.sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
@@ -633,7 +634,7 @@ function JourneyDetail({ journey, region, apiKey, cssToken, demoTransitions, dem
     } finally {
       setRecordingsLoading(false);
     }
-  }, [journey, region, cssToken]);
+  }, [journey, region, clientId, clientSecret]);
 
   const loadTransitions = useCallback(async () => {
     setLoading(true);
@@ -784,7 +785,7 @@ function JourneyDetail({ journey, region, apiKey, cssToken, demoTransitions, dem
               {recordings.length}
             </span>
           )}
-          {!recordings && !recordingsLoading && cssToken && (
+          {!recordings && !recordingsLoading && clientId && clientSecret && (
             <button
               className="ml-auto text-xs px-3 py-1 rounded border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10 transition-colors"
               onClick={loadRecordings}
@@ -792,8 +793,8 @@ function JourneyDetail({ journey, region, apiKey, cssToken, demoTransitions, dem
               Load
             </button>
           )}
-          {!recordings && !recordingsLoading && !cssToken && !demoRecordings && (
-            <span className="ml-auto text-xs text-slate-600">Add a CSS token to load recordings</span>
+          {!recordings && !recordingsLoading && (!clientId || !clientSecret) && !demoRecordings && (
+            <span className="ml-auto text-xs text-slate-600">Add Client ID &amp; Secret to load recordings</span>
           )}
         </div>
         {recordingsLoading && <div className="text-sm text-slate-500 py-2">Loading…</div>}
@@ -872,8 +873,9 @@ export default function App() {
     });
   }, []);
 
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('cidp_api_key') || '');
-  const [cssToken, setCssToken] = useState(() => localStorage.getItem('cidp_css_token') || '');
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('cidp_api_key') || import.meta.env.VITE_API_KEY || '');
+  const [clientId, setClientId] = useState(() => localStorage.getItem('cidp_client_id') || import.meta.env.VITE_CLIENT_ID || '');
+  const [clientSecret, setClientSecret] = useState(() => localStorage.getItem('cidp_client_secret') || import.meta.env.VITE_CLIENT_SECRET || '');
   const [region, setRegion] = useState(() => localStorage.getItem('cidp_region') || 'us');
   const [startDate, setStartDate] = useState(todayStart);
   const [endDate, setEndDate] = useState(todayEnd);
@@ -971,15 +973,27 @@ export default function App() {
               className="bg-[#1a2030] border border-[#2d3748] rounded-md text-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
             />
           </div>
-          {/* CSS Token */}
-          <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
-            <label className="text-[11px] uppercase tracking-widest text-slate-600">CSS Token</label>
+          {/* Client ID */}
+          <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
+            <label className="text-[11px] uppercase tracking-widest text-slate-600">Client ID</label>
             <input
               type="password"
-              value={cssToken}
-              onChange={e => setCssToken(e.target.value)}
-              onBlur={() => localStorage.setItem('cidp_css_token', cssToken)}
-              placeholder="Bearer token for recordings"
+              value={clientId}
+              onChange={e => setClientId(e.target.value)}
+              onBlur={() => localStorage.setItem('cidp_client_id', clientId)}
+              placeholder="OAuth client ID"
+              className="bg-[#1a2030] border border-[#2d3748] rounded-md text-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
+            />
+          </div>
+          {/* Client Secret */}
+          <div className="flex flex-col gap-1 flex-1 min-w-[150px]">
+            <label className="text-[11px] uppercase tracking-widest text-slate-600">Client Secret</label>
+            <input
+              type="password"
+              value={clientSecret}
+              onChange={e => setClientSecret(e.target.value)}
+              onBlur={() => localStorage.setItem('cidp_client_secret', clientSecret)}
+              placeholder="OAuth client secret"
               className="bg-[#1a2030] border border-[#2d3748] rounded-md text-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
             />
           </div>
@@ -1073,7 +1087,8 @@ export default function App() {
                 journey={selectedJourney}
                 region={region}
                 apiKey={apiKey}
-                cssToken={cssToken}
+                clientId={clientId}
+                clientSecret={clientSecret}
                 demoTransitions={isDemo ? DEMO_TRANSITIONS[selectedJourney.journeyId] : undefined}
                 demoRecordings={isDemo ? (DEMO_RECORDINGS[selectedJourney.journeyId] ?? []) : undefined}
               />
