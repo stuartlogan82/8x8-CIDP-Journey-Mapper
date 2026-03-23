@@ -1,3 +1,26 @@
+const _tokenCache = {};
+
+export async function getAccessToken(clientId, clientSecret) {
+  const cached = _tokenCache[clientId];
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+
+  const res = await fetch('/proxy/oauth', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+  if (!res.ok) throw new Error(`OAuth token request failed (${res.status}) — check your Client ID and Secret`);
+  const data = await res.json();
+  _tokenCache[clientId] = {
+    value: data.access_token,
+    expiresAt: Date.now() + (data.expires_in - 60) * 1000,
+  };
+  return _tokenCache[clientId].value;
+}
+
 const CSS_REGIONS = {
   us: '/proxy/css-us',
   eu: '/proxy/css-eu',

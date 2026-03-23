@@ -6,7 +6,7 @@
   "variable": [
     {
       "key": "api_key",
-      "value": "eght_ZmNlOTYwODItZDg3OC00YzQwLWFlMjctMzdlMzA2ZGNjYzQz",
+      "value": "YOUR_API_KEY_HERE",
       "type": "string"
     },
     {
