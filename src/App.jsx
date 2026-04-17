@@ -8,7 +8,7 @@ import {
   Play, Pause,
 } from 'lucide-react';
 import { searchJourneys, searchTransitions } from './api';
-import { fetchRecordings, getRecordingUrl, getAccessToken } from './cssApi';
+import { fetchRecordings, fetchRecordingUrls, getAccessToken } from './cssApi';
 
 // ─── Demo data ────────────────────────────────────────────────────────────────
 const D = '2026-03-23T';
@@ -603,36 +603,87 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
 
   const [recordings, setRecordings] = useState(() => demoRecordings ?? null);
   const [recordingsLoading, setRecordingsLoading] = useState(false);
+  const [recordingsStatus, setRecordingsStatus] = useState(null); // transient progress message
   const [recordingsError, setRecordingsError] = useState(null);
 
   const loadRecordings = useCallback(async () => {
     setRecordingsLoading(true);
     setRecordingsError(null);
     try {
-      const bearerToken = await getAccessToken(clientId, clientSecret);
-      const startMs = new Date(journey.time).getTime();
-      const endMs = journey.endTime
-        ? new Date(journey.endTime).getTime()
-        : startMs + 86400000;
-      const objects = await fetchRecordings(region, bearerToken, startMs, endMs);
-      const phone = journey.contact?.phoneNumber;
-      const matched = phone
-        ? objects.filter(o => JSON.stringify(o.tags || {}).includes(phone))
-        : objects;
-      const segments = await Promise.all(
-        matched.map(async (o) => ({
-          id: o.id,
-          type: o.type === 'callcenterrecording' ? 'CC' : 'UC',
-          duration: null,
-          url: await getRecordingUrl(region, bearerToken, o.id),
-        }))
+      // Stage A: OAuth
+      let bearerToken;
+      try {
+        bearerToken = await getAccessToken(clientId, clientSecret);
+      } catch (e) {
+        throw new Error(`Auth failed — check your Client ID and Secret. (${e.message})`);
+      }
+
+      // Stage B: Fetch objects from CSS Storage
+      const allLegs = [journey, ...(journey._linkedJourneys || [])];
+      // Subtract 5 min from start in case recording createdTime slightly precedes call start
+      const startMs = Math.min(...allLegs.map(j => new Date(j.time).getTime())) - 5 * 60 * 1000;
+      const rawEndMs = Math.max(...allLegs.map(j =>
+        j.endTime ? new Date(j.endTime).getTime() : 0
+      ));
+      // Cap end at now so we never send a future date to the API
+      const endMs = Math.min(
+        rawEndMs > 0 ? rawEndMs + 60000 : startMs + 86400000,
+        Date.now()
       );
+      console.log('[recordings] querying', region, new Date(startMs).toISOString(), '→', new Date(endMs).toISOString());
+
+      let objects;
+      try {
+        objects = await fetchRecordings(region, bearerToken, startMs, endMs);
+      } catch (e) {
+        throw new Error(`Could not fetch recordings from CSS Storage. (${e.message})`);
+      }
+      console.log('[recordings] raw objects', objects);
+      if (objects.length > 0) {
+        console.log('[recordings] first object tags sample:', objects[0].tags);
+      }
+
+      // Stage C: Phone number matching
+      const phone = journey.contact?.phoneNumber;
+      const digitsOnly = (p) => (p || '').replace(/\D/g, '');
+      const phoneDigits = digitsOnly(phone);
+      let matched = phone
+        ? objects.filter(o => {
+            const tagsStr = JSON.stringify(o.tags || {});
+            if (tagsStr.includes(phone)) return true;
+            if (phoneDigits && tagsStr.replace(/\D/g, '').includes(phoneDigits)) return true;
+            return false;
+          })
+        : objects;
+      console.log('[recordings] phone', phone, '→ matched', matched.length, 'of', objects.length);
+
+      // If phone filter removed everything, fall back to all objects and warn
+      if (phone && objects.length > 0 && matched.length === 0) {
+        console.warn('[recordings] phone filter matched nothing — showing all', objects.length, 'objects');
+        setRecordingsError(
+          `${objects.length} recording${objects.length !== 1 ? 's' : ''} found in this time window but none matched phone number ${phone}. Showing all recordings.`
+        );
+        matched = objects;
+      }
+
+      // Stage D: Bulk download all matched recordings, unzip, create blob URLs
+      const urlMap = await fetchRecordingUrls(region, bearerToken, matched, setRecordingsStatus);
+      setRecordingsStatus(null);
+
+      const segments = matched.map(o => ({
+        id: o.id,
+        type: o.type === 'callcenterrecording' ? 'CC' : 'UC',
+        startTime: o.createdTime,
+        duration: null,
+        url: urlMap.get(o.id) || '',
+      }));
       segments.sort((a, b) => (a.startTime ?? 0) - (b.startTime ?? 0));
       setRecordings(segments);
     } catch (e) {
       setRecordingsError(e.message);
     } finally {
       setRecordingsLoading(false);
+      setRecordingsStatus(null);
     }
   }, [journey, region, clientId, clientSecret]);
 
@@ -797,7 +848,11 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
             <span className="ml-auto text-xs text-slate-600">Add Client ID &amp; Secret to load recordings</span>
           )}
         </div>
-        {recordingsLoading && <div className="text-sm text-slate-500 py-2">Loading…</div>}
+        {recordingsLoading && (
+          <div className="text-sm text-slate-500 py-2">
+            {recordingsStatus ?? 'Loading…'}
+          </div>
+        )}
         {recordingsError && <div className="text-sm text-red-400 py-2">{recordingsError}</div>}
         {recordings && recordings.length === 0 && (
           <div className="text-sm text-slate-600">No recordings found for this journey.</div>
@@ -849,6 +904,63 @@ function JourneyRow({ journey, selected, onClick }) {
       </div>
     </div>
   );
+}
+
+// Group journeys that represent legs of the same call:
+// same contact phone number + start times within 5 minutes of each other.
+// The leg with a resolved contact name (CC side) becomes the primary.
+function groupJourneys(items) {
+  const WINDOW_MS = 5 * 60 * 1000;
+  const digitsOnly = (p) => (p || '').replace(/\D/g, '');
+
+  const used = new Set();
+  const result = [];
+
+  for (let i = 0; i < items.length; i++) {
+    if (used.has(i)) continue;
+    const phoneA = digitsOnly(items[i].contact?.phoneNumber);
+    const timeA = new Date(items[i].time).getTime();
+    const group = [items[i]];
+    used.add(i);
+
+    if (phoneA) {
+      for (let j = i + 1; j < items.length; j++) {
+        if (used.has(j)) continue;
+        const phoneB = digitsOnly(items[j].contact?.phoneNumber);
+        const timeB = new Date(items[j].time).getTime();
+        if (phoneB === phoneA && Math.abs(timeA - timeB) < WINDOW_MS) {
+          group.push(items[j]);
+          used.add(j);
+        }
+      }
+    }
+
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+
+    // Primary: prefer the leg with a resolved contact name (CC side)
+    const primary = group.find(j => j.contact?.name) || group[0];
+    const others = group.filter(j => j !== primary);
+
+    // Merge agents from all legs (deduplicated by name)
+    const agentNames = new Set((primary.agents || []).map(a => a.name));
+    const mergedAgents = [...(primary.agents || [])];
+    for (const other of others) {
+      for (const a of (other.agents || [])) {
+        if (!agentNames.has(a.name)) { agentNames.add(a.name); mergedAgents.push(a); }
+      }
+    }
+
+    result.push({
+      ...primary,
+      agents: mergedAgents,
+      _linkedJourneys: others,
+    });
+  }
+
+  return result;
 }
 
 const todayStart = () => {
@@ -914,8 +1026,8 @@ export default function App() {
       };
       if (cursor) body.nextPageCursor = cursor;
       const data = await searchJourneys(region, apiKey, body);
-      const items = data.data || [];
-      setJourneys(prev => cursor ? [...(prev || []), ...items] : items);
+      const items = groupJourneys(data.data || []);
+      setJourneys(prev => cursor ? groupJourneys([...(prev || []), ...items]) : items);
       setNextCursor(data.nextPageCursor || null);
       setTotal(data.totalElements ?? null);
       if (!cursor) setSelectedJourney(null);

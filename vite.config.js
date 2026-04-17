@@ -23,9 +23,14 @@ export default defineConfig({
         rewrite: path => path.replace(/^\/proxy\/css-us/, ''),
       },
       '/proxy/css-eu': {
-        target: 'https://api.8x8.com/storage/eu',
+        target: 'https://api-eu.8x8.com/storage/eu',
         changeOrigin: true,
         rewrite: path => path.replace(/^\/proxy\/css-eu/, ''),
+      },
+      '/proxy/css-uk': {
+        target: 'https://api-eu.8x8.com/storage/uk',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/proxy\/css-uk/, ''),
       },
       '/proxy/oauth': {
         target: 'https://api.8x8.com',
