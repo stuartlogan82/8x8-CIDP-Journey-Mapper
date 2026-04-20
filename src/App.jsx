@@ -672,7 +672,11 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
 
       const segments = matched.map(o => ({
         id: o.id,
-        type: o.type === 'callcenterrecording' ? 'CC' : 'UC',
+        type: (() => {
+          if (o.type === 'callrecording') return 'UC';
+          const transferType = o.tags?.find(t => t.key === 'transferType')?.value;
+          return transferType === 'CONSULTATION_CALL' ? 'UC' : 'CC';
+        })(),
         startTime: o.createdTime,
         duration: null,
         url: urlMap.get(o.id) || '',
@@ -727,8 +731,18 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
   };
   const oc = outcomeColors[outcome.toLowerCase()] || { bg: 'rgba(107,114,128,0.2)', color: '#9ca3af' };
 
+  // Auto-load transitions on mount (skip if demo data already provided)
+  useEffect(() => {
+    if (!demoTransitions && apiKey) loadTransitions();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-load recordings on mount (skip if demo data already provided)
+  useEffect(() => {
+    if (!demoRecordings && clientId && clientSecret) loadRecordings();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="max-w-3xl">
+    <div className="overflow-y-auto max-w-5xl px-6 py-5">
       {/* Detail header */}
       <div className="mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -790,7 +804,7 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
       </div>
 
       {/* Transitions section */}
-      <div>
+      <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-4">
           <Activity size={14} className="text-slate-500" />
           <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Transitions</span>
@@ -799,22 +813,12 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
               {allTransitions.length}
             </span>
           )}
-          {!transitions && !loading && (
-            <button
-              className="ml-auto text-xs px-3 py-1 rounded border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10 transition-colors"
-              onClick={loadTransitions}
-            >
-              Load
-            </button>
-          )}
         </div>
-
         {loading && <div className="text-sm text-slate-500 py-2">Loading…</div>}
         {error && <div className="text-sm text-red-400 py-2">{error}</div>}
         {transitions && allTransitions.length === 0 && (
           <div className="text-sm text-slate-600">No transitions found.</div>
         )}
-
         {allTransitions.length > 0 && (
           <HorizontalTimeline
             transitions={allTransitions}
@@ -827,7 +831,7 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
       </div>
 
       {/* Recordings section */}
-      <div className="mt-6">
+      <div>
         <div className="flex items-center gap-2.5 mb-4">
           <Mic size={14} className="text-slate-500" />
           <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Recordings</span>
@@ -836,26 +840,16 @@ function JourneyDetail({ journey, region, apiKey, clientId, clientSecret, demoTr
               {recordings.length}
             </span>
           )}
-          {!recordings && !recordingsLoading && clientId && clientSecret && (
-            <button
-              className="ml-auto text-xs px-3 py-1 rounded border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10 transition-colors"
-              onClick={loadRecordings}
-            >
-              Load
-            </button>
-          )}
-          {!recordings && !recordingsLoading && (!clientId || !clientSecret) && !demoRecordings && (
-            <span className="ml-auto text-xs text-slate-600">Add Client ID &amp; Secret to load recordings</span>
-          )}
         </div>
         {recordingsLoading && (
-          <div className="text-sm text-slate-500 py-2">
-            {recordingsStatus ?? 'Loading…'}
-          </div>
+          <div className="text-sm text-slate-500 py-2">{recordingsStatus ?? 'Loading…'}</div>
         )}
         {recordingsError && <div className="text-sm text-red-400 py-2">{recordingsError}</div>}
-        {recordings && recordings.length === 0 && (
+        {!recordingsLoading && !recordingsError && recordings && recordings.length === 0 && (
           <div className="text-sm text-slate-600">No recordings found for this journey.</div>
+        )}
+        {!recordingsLoading && !recordingsError && !recordings && !clientId && !clientSecret && !demoRecordings && (
+          <div className="text-sm text-slate-600">Add Client ID &amp; Secret in settings to load recordings.</div>
         )}
         {recordings && recordings.length > 0 && (
           <RecordingPlayer segments={recordings} onProgressChange={handleProgress} />
@@ -1192,7 +1186,7 @@ export default function App() {
           </div>
 
           {/* Detail panel */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex-1 overflow-hidden">
             {selectedJourney ? (
               <JourneyDetail
                 key={selectedJourney.journeyId}
