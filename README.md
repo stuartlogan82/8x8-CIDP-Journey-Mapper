@@ -33,8 +33,8 @@ Click **Load demo** in the top-right corner. Six sample journeys load instantly,
 ### Install
 
 ```bash
-git clone https://github.com/YOUR_ORG/cidp-journey-viewer.git
-cd cidp-journey-viewer
+git clone https://github.com/stuartlogan82/8x8-CIDP-Journey-Mapper.git
+cd 8x8-CIDP-Journey-Mapper
 npm install
 ```
 
