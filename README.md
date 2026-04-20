@@ -1,5 +1,7 @@
 # 8x8 Customer Journey Viewer
 
+> **Disclaimer:** This project is provided **as-is** for demonstration and proof-of-concept purposes only. It is not designed, tested, or supported for production use. It is not built to scale and comes with no guarantees around performance, security hardening, or reliability. Use it as a starting point or reference implementation — further development and review will be required before deploying in any production environment.
+
 A developer tool for visualising end-to-end customer journeys from the [8x8 CIDP Journey API](https://developer.8x8.com/). Select a journey to see every transition — STARTED → WAITING → TALKING → FINISHED — on an interactive horizontal timeline, and play back the associated call recordings inline.
 
 ---
